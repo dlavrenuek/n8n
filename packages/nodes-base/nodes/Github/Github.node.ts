@@ -121,6 +121,10 @@ export class Github implements INodeType {
 						value: 'organization',
 					},
 					{
+						name: 'Pull Request',
+						value: 'pr',
+					},
+					{
 						name: 'Release',
 						value: 'release',
 					},
@@ -209,6 +213,52 @@ export class Github implements INodeType {
 						description: 'Lock an issue',
 						action: 'Lock an issue',
 					},
+				],
+				default: 'create',
+			},
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: {
+					show: {
+						resource: ['pr'],
+					},
+				},
+				options: [
+					{
+						name: 'Create',
+						value: 'create',
+						description: 'Create a new Pull Request',
+						action: 'Create a PR',
+					},
+					/*
+					{
+						name: 'Create Comment',
+						value: 'createComment',
+						description: 'Create a new comment on an issue',
+						action: 'Create a comment on an issue',
+					},
+					{
+						name: 'Edit',
+						value: 'edit',
+						description: 'Edit an issue',
+						action: 'Edit an issue',
+					},
+					{
+						name: 'Get',
+						value: 'get',
+						description: 'Get the data of a single issue',
+						action: 'Get an issue',
+					},
+					{
+						name: 'Lock',
+						value: 'lock',
+						description: 'Lock an issue',
+						action: 'Lock an issue',
+					},
+					*/
 				],
 				default: 'create',
 			},
@@ -1021,7 +1071,7 @@ export class Github implements INodeType {
 				displayOptions: {
 					show: {
 						operation: ['create'],
-						resource: ['issue'],
+						resource: ['issue', 'pr'],
 					},
 				},
 				description: 'The title of the issue',
@@ -1037,7 +1087,7 @@ export class Github implements INodeType {
 				displayOptions: {
 					show: {
 						operation: ['create'],
-						resource: ['issue'],
+						resource: ['issue', 'pr'],
 					},
 				},
 				description: 'The body of the issue',
@@ -1053,7 +1103,7 @@ export class Github implements INodeType {
 				displayOptions: {
 					show: {
 						operation: ['create'],
-						resource: ['issue'],
+						resource: ['issue', 'pr'],
 					},
 				},
 				default: { label: '' },
@@ -1078,7 +1128,7 @@ export class Github implements INodeType {
 				displayOptions: {
 					show: {
 						operation: ['create'],
-						resource: ['issue'],
+						resource: ['issue', 'pr'],
 					},
 				},
 				default: { assignee: '' },
@@ -1092,7 +1142,37 @@ export class Github implements INodeType {
 					},
 				],
 			},
-
+			// ----------------------------------
+			//         pr:create
+			// ----------------------------------
+			{
+				displayName: 'Head Branch',
+				name: 'headBranch',
+				type: 'string',
+				default: '',
+				required: true,
+				displayOptions: {
+					show: {
+						operation: ['create'],
+						resource: ['pr'],
+					},
+				},
+				description: 'The branch with changes to be merged',
+			},
+			{
+				displayName: 'Base Branch',
+				name: 'baseBranch',
+				type: 'string',
+				default: '',
+				required: true,
+				displayOptions: {
+					show: {
+						operation: ['create'],
+						resource: ['pr'],
+					},
+				},
+				description: 'The base branch where the changes will be merged to',
+			},
 			// ----------------------------------
 			//         issue:createComment
 			// ----------------------------------
@@ -2285,6 +2365,7 @@ export class Github implements INodeType {
 			'issue:createComment',
 			'issue:edit',
 			'issue:get',
+			'pr:create',
 			'release:create',
 			'release:delete',
 			'release:get',
@@ -2586,6 +2667,28 @@ export class Github implements INodeType {
 						qs.lock_reason = this.getNodeParameter('lockReason', i) as string;
 
 						endpoint = `/repos/${owner}/${repository}/issues/${issueNumber}/lock`;
+					}
+				} else if (resource === 'pr') {
+					if (operation === 'create') {
+						// ----------------------------------
+						//         create
+						// ----------------------------------
+
+						requestMethod = 'POST';
+
+						body.title = this.getNodeParameter('title', i) as string;
+						body.body = this.getNodeParameter('body', i) as string;
+						body.base = this.getNodeParameter('baseBranch', i) as string;
+						body.head = this.getNodeParameter('headBranch', i) as string;
+
+						const labels = this.getNodeParameter('labels', i) as IDataObject[];
+
+						const assignees = this.getNodeParameter('assignees', i) as IDataObject[];
+
+						body.labels = labels.map((data) => data.label);
+						body.assignees = assignees.map((data) => data.assignee);
+
+						endpoint = `/repos/${owner}/${repository}/pulls`;
 					}
 				} else if (resource === 'release') {
 					if (operation === 'create') {

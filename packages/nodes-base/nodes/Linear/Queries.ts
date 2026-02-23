@@ -93,7 +93,7 @@ export const query = {
 					}
 				}`;
 	},
-	getIssue() {
+	getIssue(includeComments: boolean = false) {
 		return `query Issue($issueId: String!) {
 			issue(id: $issueId) {
 				id,
@@ -120,6 +120,19 @@ export const query = {
 					id
 					name
 				}
+				${
+					includeComments
+						? `
+					comments(first: 20) {
+						edges {
+							node {
+								body
+							}
+						}
+					}
+					`
+						: ''
+				}
 			}
 		}`;
 	},
@@ -132,7 +145,7 @@ export const query = {
 			}
 		}`;
 	},
-	getIssues() {
+	getIssues(includeComments: boolean = false) {
 		return `query Issue ($first: Int, $after: String){
 					issues (first: $first, after: $after){
 						nodes {
@@ -159,6 +172,19 @@ export const query = {
 						cycle {
 							id
 							name
+						}
+						${
+							includeComments
+								? `
+							comments(first: 20) {
+								edges {
+									node {
+										body
+									}
+								}
+							}
+							`
+								: ''
 						}
 					}
 					pageInfo {

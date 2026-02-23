@@ -739,6 +739,7 @@ export interface FileSystemHelperFunctions {
 	 * Use {@link resolvePath} to resolve the path first.
 	 */
 	createReadStream(filePath: ResolvedFilePath): Promise<Readable>;
+	listFiles(directoryPath: ResolvedFilePath, options?: { recursive: number }): Promise<string[]>;
 	getStoragePath(): string;
 	/**
 	 * Use {@link resolvePath} to resolve the path first.

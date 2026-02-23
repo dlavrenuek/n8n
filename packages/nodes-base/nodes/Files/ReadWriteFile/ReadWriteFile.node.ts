@@ -6,6 +6,7 @@ import type {
 } from 'n8n-workflow';
 import { NodeConnectionTypes } from 'n8n-workflow';
 
+import * as list from './actions/list.operation';
 import * as read from './actions/read.operation';
 import * as write from './actions/write.operation';
 
@@ -15,11 +16,12 @@ export class ReadWriteFile implements INodeType {
 		name: 'readWriteFile',
 		icon: 'file:readWriteFile.svg',
 		group: ['input'],
-		version: [1, 1.1],
+		version: [1, 1.1, 1.2],
 		description: 'Read or write files from the computer that runs n8n',
 		defaults: {
 			name: 'Read/Write Files from Disk',
 		},
+		usableAsTool: true,
 		inputs: [NodeConnectionTypes.Main],
 		outputs: [NodeConnectionTypes.Main],
 		properties: [
@@ -48,11 +50,18 @@ export class ReadWriteFile implements INodeType {
 						description: 'Create a binary file on the computer that runs n8n',
 						action: 'Write File to Disk',
 					},
+					{
+						name: 'List Files in a Directly',
+						value: 'list',
+						description: 'Lists files in a given directory',
+						action: 'List Files in a Directly',
+					},
 				],
 				default: 'read',
 			},
 			...read.description,
 			...write.description,
+			...list.description,
 		],
 	};
 
@@ -67,6 +76,10 @@ export class ReadWriteFile implements INodeType {
 
 		if (operation === 'write') {
 			returnData = await write.execute.call(this, items);
+		}
+
+		if (operation === 'list') {
+			returnData = await list.execute.call(this, items);
 		}
 
 		return [returnData];

@@ -1,12 +1,13 @@
 import glob from 'fast-glob';
-import { NodeApiError, NodeOperationError } from 'n8n-workflow';
+import { lookup } from 'mime-types';
+import { fileTypeFromMimeType, NodeApiError, NodeOperationError } from 'n8n-workflow';
 import type {
 	IExecuteFunctions,
 	INodeExecutionData,
 	INodeProperties,
 	JsonObject,
 } from 'n8n-workflow';
-
+import { text } from 'node:stream/consumers';
 import { updateDisplayOptions } from '@utils/utilities';
 
 import { errorMapper, normalizeFileSelector } from '../helpers/utils';
@@ -63,6 +64,14 @@ export const properties: INodeProperties[] = [
 				description: "By default 'data' is used",
 				hint: 'The name of the output binary field to put the file in',
 			},
+			{
+				displayName: 'Output as Clear Text',
+				name: 'clearText',
+				type: 'boolean',
+				default: false,
+				placeholder: 'e.g. data',
+				description: 'Whether to output file content in clear text rather than binary format',
+			},
 		],
 	},
 ];
@@ -108,35 +117,65 @@ export async function execute(this: IExecuteFunctions, items: INodeExecutionData
 				const stream = await this.helpers.createReadStream(
 					await this.helpers.resolvePath(filePath),
 				);
-				const binaryData = await this.helpers.prepareBinaryData(stream, filePath);
 
-				if (options.fileName !== undefined) {
-					binaryData.fileName = options.fileName as string;
+				if (options.clearText) {
+					const content = await text(stream);
+					let mimeType = lookup(filePath) || 'text/txt';
+					if (['ts', 'js'].some((ext) => filePath.toLowerCase().endsWith(ext))) {
+						mimeType = 'text/plain';
+					}
+					const type = fileTypeFromMimeType(mimeType);
+
+					const additionalData: Record<string, string | undefined> = {
+						type,
+					};
+					if (['text', 'json', 'html'].includes(type as string)) {
+						additionalData.text = content;
+					} else {
+						additionalData.data = Buffer.from(content).toString('base64');
+					}
+
+					newItems.push({
+						json: {
+							mimeType,
+							fileType: type,
+							...additionalData,
+						},
+						pairedItem: {
+							item: itemIndex,
+						},
+					});
+				} else {
+					const binaryData = await this.helpers.prepareBinaryData(stream, filePath);
+
+					if (options.fileName !== undefined) {
+						binaryData.fileName = options.fileName as string;
+					}
+
+					if (options.fileExtension !== undefined) {
+						binaryData.fileExtension = options.fileExtension as string;
+					}
+
+					if (options.mimeType !== undefined) {
+						binaryData.mimeType = options.mimeType as string;
+					}
+
+					newItems.push({
+						binary: {
+							[dataPropertyName]: binaryData,
+						},
+						json: {
+							mimeType: binaryData.mimeType,
+							fileType: binaryData.fileType,
+							fileName: binaryData.fileName,
+							fileExtension: binaryData.fileExtension,
+							fileSize: binaryData.fileSize,
+						},
+						pairedItem: {
+							item: itemIndex,
+						},
+					});
 				}
-
-				if (options.fileExtension !== undefined) {
-					binaryData.fileExtension = options.fileExtension as string;
-				}
-
-				if (options.mimeType !== undefined) {
-					binaryData.mimeType = options.mimeType as string;
-				}
-
-				newItems.push({
-					binary: {
-						[dataPropertyName]: binaryData,
-					},
-					json: {
-						mimeType: binaryData.mimeType,
-						fileType: binaryData.fileType,
-						fileName: binaryData.fileName,
-						fileExtension: binaryData.fileExtension,
-						fileSize: binaryData.fileSize,
-					},
-					pairedItem: {
-						item: itemIndex,
-					},
-				});
 			}
 			returnData.push(...newItems);
 		} catch (error) {

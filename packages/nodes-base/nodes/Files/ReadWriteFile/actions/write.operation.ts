@@ -47,6 +47,14 @@ export const properties: INodeProperties[] = [
 				description:
 					"Whether to append to an existing file. While it's commonly used with text files, it's not limited to them, however, it wouldn't be applicable for file types that have a specific structure like most binary formats.",
 			},
+			{
+				displayName: 'Content to Be Written',
+				name: 'clearTextContent',
+				type: 'string',
+				default: '',
+				placeholder: 'This will be written to a file',
+				description: 'When set will be used as file content instead of binary data',
+			},
 		],
 	},
 ];
@@ -83,13 +91,18 @@ export async function execute(this: IExecuteFunctions, items: INodeExecutionData
 			};
 			Object.assign(newItem.json, item.json);
 
-			const binaryData = this.helpers.assertBinaryData(itemIndex, dataPropertyName);
-
 			let fileContent: Buffer | Readable;
-			if (binaryData.id) {
-				fileContent = await this.helpers.getBinaryStream(binaryData.id);
+			if (options.clearTextContent) {
+				const content = String(options.clearTextContent);
+				fileContent = Buffer.from(content);
 			} else {
-				fileContent = Buffer.from(binaryData.data, BINARY_ENCODING);
+				const binaryData = this.helpers.assertBinaryData(itemIndex, dataPropertyName);
+
+				if (binaryData.id) {
+					fileContent = await this.helpers.getBinaryStream(binaryData.id);
+				} else {
+					fileContent = Buffer.from(binaryData.data, BINARY_ENCODING);
+				}
 			}
 
 			// Write the file to disk

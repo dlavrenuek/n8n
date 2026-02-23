@@ -10,6 +10,7 @@ import {
 	realpath as fsRealpath,
 	stat as fsStat,
 	open as fsOpen,
+	readdir as fsReaddir,
 } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { posix, dirname, basename, join } from 'node:path';
@@ -95,6 +96,35 @@ function isFilePathBlocked(resolvedFilePath: ResolvedFilePath): boolean {
 	return false;
 }
 
+const _listFiles: FileSystemHelperFunctions['listFiles'] = async (
+	resolvedFilePath,
+	{ recursive } = { recursive: 0 },
+) => {
+	const files = await fsReaddir(resolvedFilePath, { withFileTypes: true });
+
+	const filesInDir = (
+		await Promise.all(
+			files.map(async (file) => {
+				const result: string[] = [];
+				if (!file.isSymbolicLink() && (file.isFile() || file.isDirectory())) {
+					const fullName = join(file.parentPath, file.name);
+					result.push(fullName);
+					if (recursive > 0 && file.isDirectory()) {
+						result.push(
+							...(await _listFiles(await resolvePath(fullName), {
+								recursive: recursive - 1,
+							})),
+						);
+					}
+				}
+				return result;
+			}),
+		)
+	).flat(Infinity) as string[];
+
+	return filesInDir;
+};
+
 export const getFileSystemHelperFunctions = (node: INode): FileSystemHelperFunctions => ({
 	async createReadStream(resolvedFilePath) {
 		// Get the device and inode number of the path we're checking.
@@ -161,6 +191,34 @@ export const getFileSystemHelperFunctions = (node: INode): FileSystemHelperFunct
 
 	getStoragePath() {
 		return safeJoinPath(Container.get(InstanceSettings).n8nFolder, `storage/${node.type}`);
+	},
+
+	async listFiles(resolvedFilePath, options) {
+		// Check that the path is allowed.
+		if (isFilePathBlocked(resolvedFilePath)) {
+			throw new NodeOperationError(
+				node,
+				`The file "${String(resolvedFilePath)}" is not writable.`,
+				{
+					level: 'warning',
+				},
+			);
+		}
+
+		try {
+			await fsAccess(resolvedFilePath);
+		} catch (error) {
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+			throw error.code === 'ENOENT'
+				? // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+					new NodeOperationError(node, error, {
+						message: `The directory "${String(resolvedFilePath)}" could not be accessed.`,
+						level: 'warning',
+					})
+				: error;
+		}
+
+		return await _listFiles(resolvedFilePath, options);
 	},
 
 	async writeContentToFile(resolvedFilePath, content, flag) {

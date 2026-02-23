@@ -258,7 +258,7 @@ export class Linear implements INodeType {
 					if (operation === 'get') {
 						const issueId = this.getNodeParameter('issueId', i) as string;
 						const body: IGraphqlBody = {
-							query: query.getIssue(),
+							query: query.getIssue(true),
 							variables: {
 								issueId,
 							},
@@ -270,7 +270,7 @@ export class Linear implements INodeType {
 					if (operation === 'getAll') {
 						const returnAll = this.getNodeParameter('returnAll', i);
 						const body: IGraphqlBody = {
-							query: query.getIssues(),
+							query: query.getIssues(true),
 							variables: {
 								first: 50,
 							},
@@ -328,6 +328,19 @@ export class Linear implements INodeType {
 
 						responseData = await linearApiRequest.call(this, requestBody);
 						responseData = responseData?.data?.commentCreate;
+					}
+
+					if (operation === 'get') {
+						const issueId = this.getNodeParameter('issueId', i) as string;
+						const body: IGraphqlBody = {
+							query: query.getIssue(),
+							variables: {
+								issueId,
+							},
+						};
+
+						responseData = await linearApiRequest.call(this, body);
+						responseData = responseData.data.issue;
 					}
 				}
 
